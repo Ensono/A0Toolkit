@@ -1,0 +1,151 @@
+{
+  "environments": [
+    {
+      "Name": "common",
+      "auth0": {
+        "clientId": "#{Auth0.PowerShell.DeployClientId}",
+        "clientSecret": "#{Auth0.PowerShell.DeployClientSecret}",
+        "account": {
+          "payload": {
+            "session_lifetime": 2,
+            "default_directory": "Username-Password-Authentication",
+            "flags": {
+              "enable_client_connections": false,
+              "enable_apis_section": true
+            }
+          }
+        },
+        "email": {
+          "payload": {
+            "name": "sendgrid",
+            "enabled": true,
+            "default_from_address": "someemail@somedomain.com",
+            "credentials": {
+              "api_key": "#{Notifications.Core.SendgridAPIKey}"
+            }
+          }
+        },
+        "protectedClients": [
+          "All Applications",
+          "Default App",
+          "auth0-deploy-cli-extension",
+          "powershell-deploy-cli",
+          "auth0-logs-to-application-insights",
+          "Support Center API Management Client"
+        ],
+        "clients": [
+          {
+            "Name": "API Explorer Client",
+            "payload": {
+              "name": "powershell-deploy-cli",
+              "description": "Client for PowerShell Deployments"
+            }
+          },
+          {
+            "Name": "Test Relying Party Site",
+            "Delete": "#{Auth0.PowerShell.DeleteTestRelyingPartyClient}"
+          }
+        ],
+        "protectedConnections": [],
+        "connections": [
+          {
+            "name": "Username-Password-Authentication",
+            "payload": {
+              "options": {
+                "passwordPolicy": "good"
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          },
+          {
+            "name": "facebook",
+            "strategy": "facebook",
+            "payload": {
+              "options": {
+                "client_id": "#{Auth0.Core.FacebookClientId}",
+                "client_secret": "#{Auth0.Core.FacebookClientSecret}",
+                "email": true,
+                "user_birthday": true
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          },
+          {
+            "name": "google-oauth2",
+            "strategy": "google-oauth2",
+            "payload": {
+              "options": {
+                "client_id": "#{Auth0.Core.GoogleClientId}",
+                "client_secret": "#{Auth0.Core.GoogleClientSecret}",
+                "email": true,
+                "profile": true
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          },
+          {
+            "name": "linkedin",
+            "strategy": "linkedin",
+            "payload": {
+              "options": {
+                "client_id": "#{Auth0.Core.LinkedInClientId}",
+                "client_secret": "#{Auth0.Core.LinkedInClientSecret}",
+                "email": true
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          },
+          {
+            "name": "#{Auth0.AAD.WAADConnectionName}-waad",
+            "strategy": "waad",
+            "payload": {
+              "options": {
+                "client_id": "#{Runtime.AAD.ApplicationNameClientId}",
+                "client_secret": "#{Auth0.AAD.ApplicationNameClientSecret}",
+                "tenant_domain": "#{Core.AAD.PrimaryTenantName}",
+                "domain_aliases": [
+                  "someotherdomain.co.uk"
+                ]
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          },
+          {
+            "name": "#{Auth0.AAD.WAADConnectionName}-waad-native",
+            "strategy": "waad",
+            "payload": {
+              "options": {
+                "app_id": "https://#{Core.AAD.PrimaryTenantName}/auth0#{Auth0.Core.TenantName}",
+                "client_id": "#{Runtime.AAD.NativeApplicationNameClientId}",
+                "client_secret": "NotRequiredForNativeAppPasswordGrant",
+                "tenant_domain": "#{Auth0.Core.TenantName}",
+                "domain_aliases": [
+                  "someotherdomain.co.uk"
+                ]
+              }
+            },
+            "clients": [
+              "Sample Employee Website",
+              "Sample Customer Website"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
