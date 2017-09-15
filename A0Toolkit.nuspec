@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>a0toolkit</id>
+    <version>$version$</version>
+    <title>A0Toolkit</title>
+    <summary>A collection of PowerShell functions for Auth0</summary>
+    <description>A0Toolkit provides custom Auth0 functions via a PowerShell module to support the Auth0 management API.</description>
+    <tags>auth0 powershell module functions tools</tags>
+    <authors>Andrew.Waite</authors>
+	<owners>Andrew.Waite</owners>
+    <projectUrl>https://github.com/amido/A0Toolkit</projectUrl>
+    <packageSourceUrl>https://github.com/amido/A0Toolkit</packageSourceUrl>
+    <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.html</licenseUrl>
+  </metadata>
+  <files>
+    <file src="Src\A0Toolkit.psm1" target="Tools" />
+    <file src="Src\A0Toolkit.psd1" target="Tools" />
+    <file src="LICENSE*" target="Tools" />
+    <file src="chocolateyInstall.ps1" />
+    <file src="Src\Functions\**\*.*" target="Tools\Functions" exclude="Src\Functions\**\*.Tests.ps1"/>
+  </files>
+</package>

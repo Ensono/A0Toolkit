@@ -1,0 +1,46 @@
+version: 1.0.0.{build}
+image: WMF 5
+clone_folder: C:\Projects\A0Toolkit
+
+environment:
+ apiKey:
+  secure: i9cCJhWEZpaDUv3zEUL8p5VKt8B8TcVQe2oWn9LZoRVmklTZIbFcd4khKVSIzoXN
+
+install:
+ - cinst -y Pester --version 3.4.0
+
+build: off
+
+test_script:
+ - ps: |
+    # // running Pester tests //
+    $testResultsFile = ".\testResults.xml"
+    $testResults = Invoke-Pester .\src\Functions -OutputFormat NUnitXml -OutputFile $testResultsFile -PassThru
+
+    # // pushing test results to Appveyor //
+    (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/nunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $testResultsFile))
+
+    # // if any tests fail, upload results as an artifact and fail the build //
+    If ($testResults.FailedCount -gt 0) {
+     Push-AppveyorArtifact $testResultsFile
+     Throw ("{0} test failed out of {1}" -f $testResults.FailedCount, $testResults.TotalCount)
+    }
+
+after_test:
+ - ps: |
+    # // packaging nusepc file //
+    $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
+    choco pack .\A0Toolkit.nuspec --version $packageVersion
+
+    # // pushing NuGet package to Appveyor //
+    Push-AppveyorArtifact (".\A0Toolkit.{0}.nupkg" -f $packageVersion)
+
+deploy_script:
+ - ps: |
+    # // checking for tags and publishing to Chocolatey //
+    Write-Host ("{0} - {1}" -f $env:APPVEYOR_REPO_BRANCH, $env:APPVEYOR_REPO_TAG)
+    If($env:APPVEYOR_REPO_TAG -eq "true") {
+     Write-Host ("Tag Name: {0}" -f $env:APPVEYOR_REPO_TAG_NAME)
+     choco apiKey -k $env:apiKey -source https://chocolatey.org/
+     choco push (".\A0Toolkit.{0}.nupkg" -f $packageVersion)
+    }
