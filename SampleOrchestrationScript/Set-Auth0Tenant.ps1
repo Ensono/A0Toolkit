@@ -31,7 +31,7 @@
     $runtimeConfig.Add("headers", @{"content-type" = "application/json"})
 
     
-    <# // used in combination with the Auth0 Deploy CLI configuration file //
+    <# // dependency on Auth0 Deploy CLI configuration //
 
     $a0ConfigurationFile = ("{0}-auth0-config.json" -f $targetEnvironment)
     If ((-not (Test-Path $configurationFile)) -or (-not (Test-Path $a0ConfigurationFile))) {
@@ -81,7 +81,7 @@
 
     }
 
-    <# // used in combination with the Auth0 Deploy CLI configuration file //
+    <# // dependency on Auth0 Deploy CLI configuration //
 
     Write-Information "`nAdd settings from Auth0 configuration file"
     If (-not $runtimeConfig.ContainsKey("domain")) {
@@ -324,7 +324,8 @@
     }
 
     
-    
+    <# // dependency on Auth0 Deploy CLI configuration //
+
     Write-Information "`nDelete client"
     
     $auth0DeployClients = (Get-ChildItem -Path "Auth0\clients").BaseName
@@ -347,3 +348,5 @@
 
         }
     }
+
+    #>
