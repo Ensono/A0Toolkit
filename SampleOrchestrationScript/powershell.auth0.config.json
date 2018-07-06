@@ -2,12 +2,12 @@
   "environments": [
     {
       "Name": "common",
-      "auth0": {
+      "Auth0": {
         "clientId": "#{Auth0.PowerShell.DeployClientId}",
         "clientSecret": "#{Auth0.PowerShell.DeployClientSecret}",
+        "domain": "https://#{Auth0.Core.TenantName}.eu.auth0.com",
         "account": {
           "payload": {
-            "session_lifetime": 2,
             "default_directory": "Username-Password-Authentication",
             "flags": {
               "enable_client_connections": false,
@@ -19,28 +19,25 @@
           "payload": {
             "name": "sendgrid",
             "enabled": true,
-            "default_from_address": "someemail@somedomain.com",
+            "default_from_address": "noreply@somedomain.com",
             "credentials": {
-              "api_key": "#{Notifications.Core.SendgridAPIKey}"
+              "api_key": "#{Auth0.PowerShell.SendgridAPIKey}"
             }
           }
         },
+        "protectedResourceServers": [
+          "Auth0 Management API"
+        ],
         "protectedClients": [
           "All Applications",
           "Default App",
           "auth0-deploy-cli-extension",
           "powershell-deploy-cli",
-          "auth0-logs-to-application-insights",
-          "Support Center API Management Client"
+          "Support Center API Management Client",
+          "Support Center API Prod APIv2 Client Management Client",
+          "API Explorer Client"
         ],
         "clients": [
-          {
-            "Name": "API Explorer Client",
-            "payload": {
-              "name": "powershell-deploy-cli",
-              "description": "Client for PowerShell Deployments"
-            }
-          },
           {
             "Name": "Test Relying Party Site",
             "Delete": "#{Auth0.PowerShell.DeleteTestRelyingPartyClient}"
@@ -56,7 +53,6 @@
               }
             },
             "clients": [
-              "Sample Employee Website",
               "Sample Customer Website"
             ]
           },
@@ -65,14 +61,13 @@
             "strategy": "facebook",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.Core.FacebookClientId}",
-                "client_secret": "#{Auth0.Core.FacebookClientSecret}",
+                "client_id": "#{Auth0.PowerShell.FacebookClientId}",
+                "client_secret": "#{Auth0.PowerShell.FacebookClientSecret}",
                 "email": true,
                 "user_birthday": true
               }
             },
             "clients": [
-              "Sample Employee Website",
               "Sample Customer Website"
             ]
           },
@@ -81,14 +76,13 @@
             "strategy": "google-oauth2",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.Core.GoogleClientId}",
-                "client_secret": "#{Auth0.Core.GoogleClientSecret}",
+                "client_id": "#{Auth0.PowerShell.GoogleClientId}",
+                "client_secret": "#{Auth0.PowerShell.GoogleClientSecret}",
                 "email": true,
                 "profile": true
               }
             },
             "clients": [
-              "Sample Employee Website",
               "Sample Customer Website"
             ]
           },
@@ -97,51 +91,52 @@
             "strategy": "linkedin",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.Core.LinkedInClientId}",
-                "client_secret": "#{Auth0.Core.LinkedInClientSecret}",
+                "client_id": "#{Auth0.PowerShell.LinkedInClientId}",
+                "client_secret": "#{Auth0.PowerShell.LinkedInClientSecret}",
                 "email": true
               }
             },
             "clients": [
-              "Sample Employee Website",
               "Sample Customer Website"
             ]
           },
           {
-            "name": "#{Auth0.AAD.WAADConnectionName}-waad",
+            "name": "#{Auth0.PowerShell.WAADConnectionBaseName}-waad",
             "strategy": "waad",
             "payload": {
               "options": {
-                "client_id": "#{Runtime.AAD.ApplicationNameClientId}",
-                "client_secret": "#{Auth0.AAD.ApplicationNameClientSecret}",
-                "tenant_domain": "#{Core.AAD.PrimaryTenantName}",
+                "client_id": "#{Runtime.AAD.Auth0ApplicationNameClientId}",
+                "client_secret": "#{Auth0.PowerShell.Auth0ApplicationNameClientSecret}",
+                "tenant_domain": "#{Auth0.PowerShell.PrimaryADTenant}",
                 "domain_aliases": [
-                  "someotherdomain.co.uk"
-                ]
+                  "someotherdomain.co.uk",
+                  "anotherdomain.co.uk"
+                ],
+                "ext_groups": true
               }
             },
             "clients": [
-              "Sample Employee Website",
-              "Sample Customer Website"
+              "Sample Employee Website"
             ]
           },
           {
-            "name": "#{Auth0.AAD.WAADConnectionName}-waad-native",
+            "name": "#{Auth0.PowerShell.WAADConnectionBaseName}-waad-native",
             "strategy": "waad",
             "payload": {
               "options": {
-                "app_id": "https://#{Core.AAD.PrimaryTenantName}/auth0#{Auth0.Core.TenantName}",
-                "client_id": "#{Runtime.AAD.NativeApplicationNameClientId}",
+                "app_id": "https://#{Auth0.PowerShell.PrimaryADTenant}/auth0-#{Auth0.Core.TenantName}",
+                "client_id": "#{Runtime.AAD.Auth0NativeApplicationNameClientId}",
                 "client_secret": "NotRequiredForNativeAppPasswordGrant",
-                "tenant_domain": "#{Auth0.Core.TenantName}",
+                "tenant_domain": "#{Auth0.PowerShell.PrimaryADTenant}",
                 "domain_aliases": [
-                  "someotherdomain.co.uk"
-                ]
+                  "someotherdomain.co.uk",
+                  "anotherdomain.co.uk"
+                ],
+                "ext_groups": true
               }
             },
             "clients": [
-              "Sample Employee Website",
-              "Sample Customer Website"
+              "Smoke Test"
             ]
           }
         ]

@@ -1,66 +1,71 @@
-﻿    [CmdletBinding()]
+﻿Function Set-Auth0Tenant {
+	
+    [CmdletBinding()]
     param (		
         
         [Parameter(Mandatory=$true)]
-        [ValidateSet('dev', 'test', 'uat', 'preprod', 'prod')]
+        [ValidateSet("dev", "test", "uat", "preprod", "prod")]
         [string]$targetEnvironment,
 
         [Parameter(Mandatory=$false)]
-        [string]$configurationFile = "powershell.auth0.config.json"
+        [string]$configurationFile = "Tenant\powershell.auth0.config.json",
+
+        [Parameter(Mandatory=$false)]
+        [switch]$enableDeletions
     )
    
     Write-Host ("`nRunning function: {0}" -f $MyInvocation.MyCommand.Name) -ForegroundColor Yellow
 
     
     # // setup //
-
-    $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-    Set-Location -Path $here
-
     $InformationPreference = "Continue"
     Write-Information "Setup"
     
-
-    If (-not (Get-Module -ListAvailable A0Toolkit).Name) {
+    If (-not (Get-Module "A0Toolkit").Name) {
 
         Throw "Missing PowerShell module 'A0Toolkit'"
     }
 
-
     $runtimeConfig = @{}
     $runtimeConfig.Add("headers", @{"content-type" = "application/json"})
 
-    
     <# // dependency on Auth0 Deploy CLI configuration //
+    If ($targetEnvironment -eq 'dev') {
+        
+        $a0ConfigurationFile = ("Tenant\{0}-auth0-config.json" -f $targetEnvironment)
+    
+    } Else {
 
-    $a0ConfigurationFile = ("{0}-auth0-config.json" -f $targetEnvironment)
+        $a0ConfigurationFile = ("Tenant\master-auth0-config.json" -f $targetEnvironment)
+
+    }
+    
     If ((-not (Test-Path $configurationFile)) -or (-not (Test-Path $a0ConfigurationFile))) {
         
         Throw "Missing PowerShell ({0}) or Auth0 ({1}) configuration file(s)" -f $configurationFile, $a0ConfigurationFile
     
     }
-    
     #>
-
     
     Write-Information "`nLoading configuration files"
-    $psConfiguration = Get-Content -Path $configurationFile -ErrorAction Stop | ConvertFrom-Json
-    #$a0Configuration = Get-Content -Path $a0ConfigurationFile -ErrorAction Stop | ConvertFrom-Json
-
+    $psConfiguration = Get-Content -Path $configurationFile | ConvertFrom-Json
+    <# // dependency on Auth0 Deploy CLI configuration //
+    $a0Configuration = Get-Content -Path $a0ConfigurationFile | ConvertFrom-Json
+    #>
 
     Write-Information ("`nBuild {0} environment runtime configuration from json file" -f $targetEnvironment)    
     If ($psConfiguration.Environments.Name -contains $targetEnvironment) {
         $allowedPSOverrides = "clientId", "clientSecret", "clients", "account", "email", "connections", "protectedClients", "protectedConnections"
         
-        $envnConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq $targetEnvironment}).Auth0        
-        $envnConfiguration | Get-Member -MemberType Properties | ForEach-Object {
+        $envConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq $targetEnvironment}).Auth0        
+        $envConfiguration | Get-Member -MemberType Properties | ForEach-Object {
         
             $name = $_.Name
         
             If (($allowedPSOverrides.Contains($name))) {
             
                 Write-Information $name            
-                $runtimeConfig.Add($name,$envnConfiguration.$name)
+                $runtimeConfig.Add($name,$envConfiguration.$name)
             }
         }
     }
@@ -69,7 +74,7 @@
     Write-Information "`nBuild common environment runtime configuration from json file"
     
     $commonConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq "Common"}).Auth0
-    $commonConfiguration | Get-Member -MemberType Properties -ErrorAction Stop | ForEach-Object {        
+    $commonConfiguration | Get-Member -MemberType Properties | ForEach-Object {        
     
         $name = $_.Name
 
@@ -82,13 +87,11 @@
     }
 
     <# // dependency on Auth0 Deploy CLI configuration //
-
     Write-Information "`nAdd settings from Auth0 configuration file"
     If (-not $runtimeConfig.ContainsKey("domain")) {
         
         $runtimeConfig.Add("domain",("https://{0}" -f $a0Configuration.AUTH0_DOMAIN))
     }
-    
     #>
 
 
@@ -199,11 +202,34 @@
     $connectionNameToIdMapping | Format-Table -AutoSize
 
 
-    Write-Information "`nGet all client grants"
-    $response = Get-A0ClientGrants -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
+    Write-Information "`nGet all resource servers (APIs)"
+    $response = Get-A0ResourceServer -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
+    $resourceServers = ($response.Content | ConvertFrom-Json)
+
+    $resourceServerNameToIdMapping = @{}
+    
+    Foreach ($resourceServer in $resourceServers) {
+    
+        Try {
+        
+            $resourceServerNameToIdMapping.Add($resourceServer.name,$resourceServer.id)
+        }
+
+        Catch {
+            
+            Write-Warning ($resourceServers | Select-Object -Property name, id | Out-String)
+            Throw "Error building resource server mapping"
+        }
+
+    }
+
+    $resourceServerNameToIdMapping | Format-Table -AutoSize
+
 
 
     Write-Information "`nProcess clients in ps configuration"
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
+
     Foreach ($client in $runtimeConfig.clients) {
 
         Write-Information ("`n{0}" -f $client.Name)
@@ -211,30 +237,36 @@
 
         If ($clientNameToIdMapping.ContainsKey($client.Name)) {
             
-            If (($client.Delete -eq $false) -and ($client.payload)) {
+            If ((-not $client.Delete) -and ($client.payload)) {
                 
                 Write-Information "Update client"
                 $response = Set-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId -payload $client.payload
 
                 If ($response.StatusCode -ne 200) {
 
-                Write-Warning $response.StatusCode
-                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                Throw ("Error updating {0}: {1} ({2})" -f "client", $client.Name, $clientId)
+                    Write-Warning $response.StatusCode
+                    Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                    Throw ("Error updating {0}: {1} ({2})" -f "client", $client.Name, $clientId)
 
                 }
+            
             } ElseIf ($client.Delete -eq $true) {
                 
                 Write-Information "Remove client"
+                
+                If ($enableDeletions) {
 
-                $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
+                    $clientNameToIdMapping.Remove($client.Name)
 
-                If ($response.StatusCode -ne 204) {
+                    $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
 
-                Write-Warning $response.StatusCode
-                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                Throw ("Error deleting {0}: {1} ({2})" -f "client", $client.Name, $clientId)
+                    If ($response.StatusCode -ne 204) {
 
+                        Write-Warning $response.StatusCode
+                        Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                        Throw ("Error deleting {0}: {1} ({2})" -f "client", $client.Name, $clientId)
+
+                    }
                 }
             }
 
@@ -303,6 +335,7 @@
 
     
     Write-Information "`nDelete connection"
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
 
     $connectionsToDelete = $connectionNameToIdMapping.Keys | Where-Object {($runtimeConfig.connections.Name -notcontains $_) -and ($runtimeConfig.protectedConnections -notcontains $_)}
 
@@ -312,23 +345,26 @@
             
         Write-Warning ("`n{0} ({1})" -f $connectionName, $connectionId)
         
-        $response = Remove-A0Connection -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -connectionId $connectionId
+        If ($enableDeletions) {
 
-        If ($response.StatusCode -ne 204) {
+            $response = Remove-A0Connection -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -connectionId $connectionId
 
-            Write-Warning $response.StatusCode
-            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-            Throw ("Error deleting Auth0 {0}" -f "connection", $connectionName)
+            If ($response.StatusCode -ne 204) {
 
+                Write-Warning $response.StatusCode
+                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                Throw ("Error deleting Auth0 {0}" -f "connection", $connectionName)
+
+            }
         }
     }
 
     
     <# // dependency on Auth0 Deploy CLI configuration //
-
     Write-Information "`nDelete client"
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
-    $auth0DeployClients = (Get-ChildItem -Path "Auth0\clients").BaseName
+    $auth0DeployClients = (Get-ChildItem -Path "Tenant\clients").BaseName
 
     $clientsToDelete = $clientNameToIdMapping.Keys | Where-Object {($runtimeConfig.clients.Name -notcontains $_) -and ($auth0DeployClients -notcontains $_) -and ($runtimeConfig.protectedClients -notcontains $_)}
     
@@ -338,15 +374,49 @@
             
         Write-Warning ("{0} ({1})" -f $clientnName, $clientId)
 
-        $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
+        If ($enableDeletions) {
+            
+            $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
 
-        If ($response.StatusCode -ne 204) {
+            If ($response.StatusCode -ne 204) {
 
-            Write-Warning $response.StatusCode
-            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-            Throw ("Error deleting Auth0 {0}" -f "client", $clientnName)
+                Write-Warning $response.StatusCode
+                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                Throw ("Error deleting Auth0 {0}" -f "client", $clientnName)
+
+            }
 
         }
     }
-
     #>
+
+    <# // dependency on Auth0 Deploy CLI configuration //
+    Write-Information "`nDelete resource server"
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
+    
+    $auth0ResourceServers = (Get-ChildItem -Path "Tenant\resource-servers").BaseName
+
+    $resourceServersToDelete = $resourceServerNameToIdMapping.Keys | Where-Object {($auth0ResourceServers -notcontains $_) -and ($runtimeConfig.protectedResourceServers -notcontains $_)}
+    
+    Foreach ($resourceServerName in $resourceServersToDelete) {                
+            
+        $resourceServerId = $resourceServerNameToIdMapping.$resourceServerName
+            
+        Write-Warning ("{0} ({1})" -f $resourceServerName, $resourceServerId)
+
+        If ($enableDeletions) {
+            
+            $response = Remove-A0ResourceServer -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -resourceServerId $resourceServerId
+            
+            If ($response.StatusCode -ne 204) {
+
+                Write-Warning $response.StatusCode
+                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                Throw ("Error deleting Auth0 {0}" -f "resource server", $resourceServerName)
+
+            }
+            
+        }
+    }
+    #>
+}
