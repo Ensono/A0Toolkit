@@ -20,6 +20,7 @@ List of exported functions:
 * New-A0Token
 * Remove-A0Client
 * Remove-A0Connection
+* Remove-A0ResourceServer
 * Set-A0Client
 * Set-A0Connection
 * Set-A0EmailProvider
