@@ -1,4 +1,7 @@
-version: 1.1.0.{build}
+ - ps: |
+    $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
+    Update-AppveyorBuild -Version ("{0}.{1}" -f $packageVersion, $env:APPVEYOR_BUILD_VERSION)
+
 image: WMF 5
 clone_folder: C:\Projects\A0Toolkit
 
@@ -29,7 +32,6 @@ test_script:
 after_test:
  - ps: |
     # // packaging nusepc file //
-    $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
     choco pack .\A0Toolkit.nuspec --version $packageVersion
 
     # // pushing NuGet package to Appveyor //
