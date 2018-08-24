@@ -15,15 +15,18 @@ List of exported functions:
 * Get-A0Connection
 * Get-A0EmailProvider
 * Get-A0ResourceServer
+* Get-A0RuleConfig
 * New-A0Connection
 * New-A0EmailProvider
 * New-A0Token
 * Remove-A0Client
 * Remove-A0Connection
 * Remove-A0ResourceServer
+* Remove-A0RuleConfig
 * Set-A0Client
 * Set-A0Connection
 * Set-A0EmailProvider
+* Set-A0RuleConfig  
 * Set-A0Tenant  
 
 

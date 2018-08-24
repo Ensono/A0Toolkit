@@ -8,8 +8,8 @@
         [string]$targetEnvironment,
 
         [Parameter(Mandatory=$false)]
-        [string]$configurationFile = "Tenant\powershell.auth0.config.json",
-
+        [string]$configurationFile = "Auth0\powershell.auth0.config.json",
+        
         [Parameter(Mandatory=$false)]
         [switch]$enableDeletions
     )
@@ -21,8 +21,8 @@
     $InformationPreference = "Continue"
     Write-Information "Setup"
     
-    If (-not (Get-Module "A0Toolkit").Name) {
-
+    If ((Get-Command *-A0*).Name -eq $null) {
+        
         Throw "Missing PowerShell module 'A0Toolkit'"
     }
 
@@ -32,11 +32,11 @@
     <# // dependency on Auth0 Deploy CLI configuration //
     If ($targetEnvironment -eq 'dev') {
         
-        $a0ConfigurationFile = ("Tenant\{0}-auth0-config.json" -f $targetEnvironment)
+        $a0ConfigurationFile = ("Auth0\{0}-auth0-config.json" -f $targetEnvironment)
     
     } Else {
 
-        $a0ConfigurationFile = ("Tenant\master-auth0-config.json" -f $targetEnvironment)
+        $a0ConfigurationFile = ("Auth0\master-auth0-config.json" -f $targetEnvironment)
 
     }
     
@@ -49,13 +49,10 @@
     
     Write-Information "`nLoading configuration files"
     $psConfiguration = Get-Content -Path $configurationFile | ConvertFrom-Json
-    <# // dependency on Auth0 Deploy CLI configuration //
-    $a0Configuration = Get-Content -Path $a0ConfigurationFile | ConvertFrom-Json
-    #>
 
     Write-Information ("`nBuild {0} environment runtime configuration from json file" -f $targetEnvironment)    
     If ($psConfiguration.Environments.Name -contains $targetEnvironment) {
-        $allowedPSOverrides = "clientId", "clientSecret", "clients", "account", "email", "connections", "protectedClients", "protectedConnections"
+        $allowedPSOverrides = "clientId", "clientSecret", "clients", "account", "email", "connections", "protectedClients", "protectedConnections", "ruleConfigs"
         
         $envConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq $targetEnvironment}).Auth0        
         $envConfiguration | Get-Member -MemberType Properties | ForEach-Object {
@@ -86,14 +83,6 @@
 
     }
 
-    <# // dependency on Auth0 Deploy CLI configuration //
-    Write-Information "`nAdd settings from Auth0 configuration file"
-    If (-not $runtimeConfig.ContainsKey("domain")) {
-        
-        $runtimeConfig.Add("domain",("https://{0}" -f $a0Configuration.AUTH0_DOMAIN))
-    }
-    #>
-
 
     Write-Information "`nNew management token"
     $response = New-A0Token -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $runtimeConfig.ClientId -clientSecret $runtimeConfig.clientSecret
@@ -121,6 +110,23 @@
     }
 
 
+    Write-Information "`nProcess rule configs in ps configuration"
+    Foreach ($rule in $runtimeConfig.ruleConfigs) {
+
+        Write-Information ("`nUpdate rule config: {0}" -f $rule.Key)
+
+        $response = Set-A0RuleConfig -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -key $rule.Key -Value $rule.Value
+        
+        If ($response.StatusCode -ne 200) {
+    
+            Write-Warning $response.StatusCode
+            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+            Throw ("Error updating {0}: {1}" -f "rule config", $runtimeConfig.domain)
+    
+        }
+    }
+    
+    
     Write-Information "`nGet email provider"
     $response = Get-A0EmailProvider -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
 
@@ -364,7 +370,7 @@
     Write-Information "`nDelete client"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
-    $auth0DeployClients = (Get-ChildItem -Path "Tenant\clients").BaseName
+    $auth0DeployClients = (Get-ChildItem -Path "Auth0\clients").BaseName
 
     $clientsToDelete = $clientNameToIdMapping.Keys | Where-Object {($runtimeConfig.clients.Name -notcontains $_) -and ($auth0DeployClients -notcontains $_) -and ($runtimeConfig.protectedClients -notcontains $_)}
     
@@ -394,7 +400,7 @@
     Write-Information "`nDelete resource server"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
-    $auth0ResourceServers = (Get-ChildItem -Path "Tenant\resource-servers").BaseName
+    $auth0ResourceServers = (Get-ChildItem -Path "Auth0\resource-servers").BaseName
 
     $resourceServersToDelete = $resourceServerNameToIdMapping.Keys | Where-Object {($auth0ResourceServers -notcontains $_) -and ($runtimeConfig.protectedResourceServers -notcontains $_)}
     
@@ -419,4 +425,33 @@
         }
     }
     #>
+
+
+    Write-Information "`nDelete rule config"
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
+
+    Write-Information "`nGet rule config keys"
+    $response = Get-A0RuleConfig -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
+    $ruleConfigKeys = ($response.Content | ConvertFrom-Json)
+    $ruleConfigToDelete = $ruleConfigKeys | Where-Object {$runtimeConfig.ruleConfigs.key -notcontains $_.key}
+
+    Foreach ($rule in $ruleConfigToDelete) {
+            
+        $key = $rule.key
+            
+        Write-Warning ("{0}" -f $key)
+        
+        If ($enableDeletions) {
+
+            $response = Remove-A0RuleConfig -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -key $key
+
+            If ($response.StatusCode -ne 204) {
+
+                Write-Warning $response.StatusCode
+                Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                Throw ("Error deleting Auth0 {0}" -f "rule config")
+
+            }
+        }
+    }
 }

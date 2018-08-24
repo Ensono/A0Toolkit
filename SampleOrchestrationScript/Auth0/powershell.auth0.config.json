@@ -139,6 +139,16 @@
               "Smoke Test"
             ]
           }
+        ],
+        "ruleConfigs": [
+          {
+            "key": "RuleConfigOne",
+            "value": "One"
+          },
+          {
+            "key": "RuleConfigTwo",
+            "value": "Two"
+          }
         ]
       }
     }
