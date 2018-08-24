@@ -9,7 +9,7 @@ install:
  - ps: |
     # // setting build version //
     $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
-    Update-AppveyorBuild -Version ("{0}.{1}" -f $packageVersion, $env:APPVEYOR_BUILD_VERSION)
+    Update-AppveyorBuild -Version ("{0}.{1}" -f $packageVersion, $env:APPVEYOR_BUILD_NUMBER)
 
  - cinst -y Pester --version 3.4.0
 
