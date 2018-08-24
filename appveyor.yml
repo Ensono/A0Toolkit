@@ -1,7 +1,3 @@
- - ps: |
-    $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
-    Update-AppveyorBuild -Version ("{0}.{1}" -f $packageVersion, $env:APPVEYOR_BUILD_VERSION)
-
 image: WMF 5
 clone_folder: C:\Projects\A0Toolkit
 
@@ -10,6 +6,11 @@ environment:
   secure: i9cCJhWEZpaDUv3zEUL8p5VKt8B8TcVQe2oWn9LZoRVmklTZIbFcd4khKVSIzoXN
 
 install:
+ - ps: |
+    # // setting build version //
+    $packageVersion = $(Test-ModuleManifest -Path ".\src\A0Toolkit.psd1").Version.ToString()
+    Update-AppveyorBuild -Version ("{0}.{1}" -f $packageVersion, $env:APPVEYOR_BUILD_VERSION)
+
  - cinst -y Pester --version 3.4.0
 
 build: off
