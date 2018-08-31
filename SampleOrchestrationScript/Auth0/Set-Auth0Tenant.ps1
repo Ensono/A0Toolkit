@@ -4,7 +4,6 @@
     param (		
         
         [Parameter(Mandatory=$true)]
-        [ValidateSet("dev", "test", "uat", "preprod", "prod")]
         [string]$targetEnvironment,
 
         [Parameter(Mandatory=$false)]
@@ -17,10 +16,17 @@
     Write-Host ("`nRunning function: {0}" -f $MyInvocation.MyCommand.Name) -ForegroundColor Yellow
 
     
-    # // setup //
+    # // START setup //
+
     $InformationPreference = "Continue"
     Write-Information "Setup"
+
+    If (-not (Test-Path $configurationFile)) {
+        
+        Throw ("Missing PowerShell ({0}) configuration file" -f $configurationFile)
     
+    }
+
     If ((Get-Command *-A0*).Name -eq $null) {
         
         Throw "Missing PowerShell module 'A0Toolkit'"
@@ -29,37 +35,24 @@
     $runtimeConfig = @{}
     $runtimeConfig.Add("headers", @{"content-type" = "application/json"})
 
-    <# // dependency on Auth0 Deploy CLI configuration //
-    If ($targetEnvironment -eq 'dev') {
-        
-        $a0ConfigurationFile = ("Auth0\{0}-auth0-config.json" -f $targetEnvironment)
-    
-    } Else {
+    # // END setup //
 
-        $a0ConfigurationFile = ("Auth0\master-auth0-config.json" -f $targetEnvironment)
+    
+    # // START loading configuration files //
 
-    }
-    
-    If ((-not (Test-Path $configurationFile)) -or (-not (Test-Path $a0ConfigurationFile))) {
-        
-        Throw "Missing PowerShell ({0}) or Auth0 ({1}) configuration file(s)" -f $configurationFile, $a0ConfigurationFile
-    
-    }
-    #>
-    
     Write-Information "`nLoading configuration files"
     $psConfiguration = Get-Content -Path $configurationFile | ConvertFrom-Json
 
     Write-Information ("`nBuild {0} environment runtime configuration from json file" -f $targetEnvironment)    
     If ($psConfiguration.Environments.Name -contains $targetEnvironment) {
-        $allowedPSOverrides = "clientId", "clientSecret", "clients", "account", "email", "connections", "protectedClients", "protectedConnections", "ruleConfigs"
-        
+        $excludedPSOverrides = ""
+
         $envConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq $targetEnvironment}).Auth0        
         $envConfiguration | Get-Member -MemberType Properties | ForEach-Object {
         
             $name = $_.Name
         
-            If (($allowedPSOverrides.Contains($name))) {
+            If (($excludedPSOverrides -notcontains $name)) {
             
                 Write-Information $name            
                 $runtimeConfig.Add($name,$envConfiguration.$name)
@@ -83,6 +76,10 @@
 
     }
 
+    # // END loading configuration files //
+
+
+    # // START acquire an Auth0 Management Token //
 
     Write-Information "`nNew management token"
     $response = New-A0Token -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $runtimeConfig.ClientId -clientSecret $runtimeConfig.clientSecret
@@ -97,7 +94,11 @@
     
     $runtimeConfig.headers.Add("authorization",("bearer {0}" -f (($response.Content | ConvertFrom-Json).access_token)))
 
+    # // END acquire an Auth0 Management Token //
+
     
+    # // START update Auth0 tenant settings //
+
     Write-Information "`nUpdate tenant settings"
     $response = Set-A0Tenant -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -payload $runtimeConfig.account.payload
     
@@ -109,6 +110,10 @@
 
     }
 
+    # // END update Auth0 tenant settings //
+
+    
+    # // START update rule configuration //
 
     Write-Information "`nProcess rule configs in ps configuration"
     Foreach ($rule in $runtimeConfig.ruleConfigs) {
@@ -125,7 +130,11 @@
     
         }
     }
+
+    # // END update rule configuration //
     
+    
+    # // START update email configuration //
     
     Write-Information "`nGet email provider"
     $response = Get-A0EmailProvider -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
@@ -159,6 +168,10 @@
         }
     }
 
+    # // END update email configuration //
+
+    
+    # // START get all applications/clients and maps name and Id into a hash table //
     
     Write-Information "`nGet all clients"
     $response = Get-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
@@ -183,7 +196,11 @@
 
     $clientNameToIdMapping | Format-Table -AutoSize
 
+    # // END get all applications/clients and maps name and Id into a hash table //
+
     
+    # // START get all connections and maps name and Id into a hash table //
+       
     Write-Information "`nGet all connections"
     $response = Get-A0Connection -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
     $connections = ($response.Content | ConvertFrom-Json)
@@ -207,7 +224,11 @@
 
     $connectionNameToIdMapping | Format-Table -AutoSize
 
+    # // END get all connections and maps name and Id into a hash table //
 
+
+    # // START get all resource servers and maps name and Id into a hash table //
+        
     Write-Information "`nGet all resource servers (APIs)"
     $response = Get-A0ResourceServer -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
     $resourceServers = ($response.Content | ConvertFrom-Json)
@@ -231,7 +252,10 @@
 
     $resourceServerNameToIdMapping | Format-Table -AutoSize
 
+    # // END get all resource servers and maps name and Id into a hash table //
 
+
+    # // START processing clients in the PowerShell JSON configuration file //
 
     Write-Information "`nProcess clients in ps configuration"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
@@ -279,6 +303,10 @@
         }
     }
 
+    # // END processing clients in the PowerShell JSON configuration file //
+
+
+    # // START processing connections in the PowerShell JSON configuration file //
 
     Write-Information "`nProcess connections in ps configuration"
     Foreach ($connection in $runtimeConfig.connections) {
@@ -339,6 +367,10 @@
         Write-Information ("Provisioning URL: {0}" -f $(($response.content | ConvertFrom-Json).provisioning_ticket_url))
     }
 
+    # // END processing connections in the PowerShell JSON configuration file //
+
+    
+    # // START remove connections that are not protected or exist in the PowerShell JSON configuration file //
     
     Write-Information "`nDelete connection"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
@@ -365,8 +397,13 @@
         }
     }
 
+    # // END remove connections that are not protected or exist in the PowerShell JSON configuration file //
+
+
+    # // START remove client that are not listed in the Auth0 Deploy CLI folder structure //
+
+    # // ** dependency on Auth0 Deploy CLI folder structure ** //
     
-    <# // dependency on Auth0 Deploy CLI configuration //
     Write-Information "`nDelete client"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
@@ -374,11 +411,11 @@
 
     $clientsToDelete = $clientNameToIdMapping.Keys | Where-Object {($runtimeConfig.clients.Name -notcontains $_) -and ($auth0DeployClients -notcontains $_) -and ($runtimeConfig.protectedClients -notcontains $_)}
     
-    Foreach ($clientnName in $clientsToDelete) {                
+    Foreach ($clientName in $clientsToDelete) {                
             
-        $clientId = $clientNameToIdMapping.$clientnName
+        $clientId = $clientNameToIdMapping.$clientName
             
-        Write-Warning ("{0} ({1})" -f $clientnName, $clientId)
+        Write-Warning ("{0} ({1})" -f $clientName, $clientId)
 
         If ($enableDeletions) {
             
@@ -388,15 +425,20 @@
 
                 Write-Warning $response.StatusCode
                 Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                Throw ("Error deleting Auth0 {0}" -f "client", $clientnName)
+                Throw ("Error deleting Auth0 {0}" -f "client", $clientName)
 
             }
 
         }
     }
-    #>
 
-    <# // dependency on Auth0 Deploy CLI configuration //
+    # // END remove client that are not listed in the Auth0 Deploy CLI folder structure //
+
+
+    # // START remove resource servers that are not listed in the Auth0 Deploy CLI folder structure //
+
+    # // ** dependency on Auth0 Deploy CLI folder structure ** //
+
     Write-Information "`nDelete resource server"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
@@ -424,8 +466,11 @@
             
         }
     }
-    #>
 
+    # // END remove resource servers that are not listed in the Auth0 Deploy CLI folder structure //
+
+
+    # // START remove rule configuration that do not exist in the PowerShell JSON configuration file //
 
     Write-Information "`nDelete rule config"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
@@ -454,4 +499,6 @@
             }
         }
     }
+
+    # // END remove rule configuration that do not exist in the PowerShell JSON configuration file //
 }

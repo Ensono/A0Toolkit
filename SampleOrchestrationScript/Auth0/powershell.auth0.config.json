@@ -3,8 +3,8 @@
     {
       "Name": "common",
       "Auth0": {
-        "clientId": "#{Auth0.PowerShell.DeployClientId}",
-        "clientSecret": "#{Auth0.PowerShell.DeployClientSecret}",
+        "clientId": "#{Identity.Auth0.DeployClientId}",
+        "clientSecret": "#{Identity.Auth0.DeployClientSecret}",
         "domain": "https://#{Auth0.Core.TenantName}.eu.auth0.com",
         "account": {
           "payload": {
@@ -21,7 +21,7 @@
             "enabled": true,
             "default_from_address": "noreply@somedomain.com",
             "credentials": {
-              "api_key": "#{Auth0.PowerShell.SendgridAPIKey}"
+              "api_key": "#{Identity.Auth0.SendgridAPIKey}"
             }
           }
         },
@@ -31,16 +31,14 @@
         "protectedClients": [
           "All Applications",
           "Default App",
-          "auth0-deploy-cli-extension",
-          "powershell-deploy-cli",
+          "automation-deploy-client",
           "Support Center API Management Client",
-          "Support Center API Prod APIv2 Client Management Client",
-          "API Explorer Client"
+          "Support Center API Prod APIv2 Client Management Client"
         ],
         "clients": [
           {
             "Name": "Test Relying Party Site",
-            "Delete": "#{Auth0.PowerShell.DeleteTestRelyingPartyClient}"
+            "Delete": "#{Identity.Auth0.DeleteTestRelyingPartyClient}"
           }
         ],
         "protectedConnections": [],
@@ -61,8 +59,8 @@
             "strategy": "facebook",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.PowerShell.FacebookClientId}",
-                "client_secret": "#{Auth0.PowerShell.FacebookClientSecret}",
+                "client_id": "#{Identity.Auth0.FacebookClientId}",
+                "client_secret": "#{Identity.Auth0.FacebookClientSecret}",
                 "email": true,
                 "user_birthday": true
               }
@@ -76,8 +74,8 @@
             "strategy": "google-oauth2",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.PowerShell.GoogleClientId}",
-                "client_secret": "#{Auth0.PowerShell.GoogleClientSecret}",
+                "client_id": "#{Identity.Auth0.GoogleClientId}",
+                "client_secret": "#{Identity.Auth0.GoogleClientSecret}",
                 "email": true,
                 "profile": true
               }
@@ -91,8 +89,8 @@
             "strategy": "linkedin",
             "payload": {
               "options": {
-                "client_id": "#{Auth0.PowerShell.LinkedInClientId}",
-                "client_secret": "#{Auth0.PowerShell.LinkedInClientSecret}",
+                "client_id": "#{Identity.Auth0.LinkedInClientId}",
+                "client_secret": "#{Identity.Auth0.LinkedInClientSecret}",
                 "email": true
               }
             },
@@ -101,13 +99,13 @@
             ]
           },
           {
-            "name": "#{Auth0.PowerShell.WAADConnectionBaseName}-waad",
+            "name": "#{Identity.Auth0.WAADConnectionBaseName}-waad",
             "strategy": "waad",
             "payload": {
               "options": {
                 "client_id": "#{Runtime.AAD.Auth0ApplicationNameClientId}",
-                "client_secret": "#{Auth0.PowerShell.Auth0ApplicationNameClientSecret}",
-                "tenant_domain": "#{Auth0.PowerShell.PrimaryADTenant}",
+                "client_secret": "#{Identity.Auth0.Auth0ApplicationClientSecret}",
+                "tenant_domain": "#{Identity.Auth0.PrimaryAADTenant}",
                 "domain_aliases": [
                   "someotherdomain.co.uk",
                   "anotherdomain.co.uk"
@@ -120,14 +118,14 @@
             ]
           },
           {
-            "name": "#{Auth0.PowerShell.WAADConnectionBaseName}-waad-native",
+            "name": "#{Identity.Auth0.WAADConnectionBaseName}-waad-native",
             "strategy": "waad",
             "payload": {
               "options": {
-                "app_id": "https://#{Auth0.PowerShell.PrimaryADTenant}/auth0-#{Auth0.Core.TenantName}",
+                "app_id": "https://#{Identity.Auth0.PrimaryAADTenant}/auth0-#{Auth0.Core.TenantName}",
                 "client_id": "#{Runtime.AAD.Auth0NativeApplicationNameClientId}",
                 "client_secret": "NotRequiredForNativeAppPasswordGrant",
-                "tenant_domain": "#{Auth0.PowerShell.PrimaryADTenant}",
+                "tenant_domain": "#{Identity.Auth0.PrimaryAADTenant}",
                 "domain_aliases": [
                   "someotherdomain.co.uk",
                   "anotherdomain.co.uk"
