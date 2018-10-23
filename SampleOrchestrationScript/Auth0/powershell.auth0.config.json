@@ -147,6 +147,26 @@
             "key": "RuleConfigTwo",
             "value": "Two"
           }
+        ],
+       "emailTemplates": [
+          {
+            "payload": {
+              "template": "reset_email",
+              "subject": "Password Change Request",
+              "from": "",
+              "enabled": true,
+              "syntax": "liquid"
+              }
+          },
+          {
+            "payload": {
+              "template": "welcome_email",
+              "subject": "Thank you for Registering",
+              "from": "",
+              "enabled": true,
+              "syntax": "liquid"
+              }
+          }
         ]
       }
     }

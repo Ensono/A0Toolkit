@@ -368,6 +368,31 @@
     }
 
     # // END processing connections in the PowerShell JSON configuration file //
+	
+	
+	# // START updating email templates //
+
+    Foreach ($template in $runtimeConfig.emailTemplates) {
+
+        Write-Information "`nProcess email templates in ps configuration"
+        
+        $body = Get-Content -Path (".\Auth0\email-templates\{0}.html" -f $template.payload.template) -ErrorAction Stop | Out-String
+        $template.payload | Add-Member -MemberType NoteProperty -Name "body" -Value $body
+
+         Write-Information ("`nupdate email template: {0}" -f $template.payload.template)
+         $response = Set-A0EmailTemplate -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -templateName $template.payload.template -payload $template.payload
+
+        If ($response.StatusCode -ne 200) {
+    
+            Write-Warning $response.StatusCode
+            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+            Throw ("Error updating {0}: {1}" -f "email template", $template.payload.template)
+    
+        }
+
+    }
+
+    # // END updating email templates //
 
     
     # // START remove connections that are not protected or exist in the PowerShell JSON configuration file //

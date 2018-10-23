@@ -11,10 +11,15 @@ As A0Tookit is a PowerShell module it will autoload when any exported functions 
 ## A0Toolkit
 List of exported functions:
 
+**1.3.0**
+* Get-A0EmailTemplate
+* Set-A0EmailTemplate
+
+
 **1.2.0**
 * Get-A0RuleConfig
 * Remove-A0RuleConfig
-* Set-A0RuleConfig  
+* Set-A0RuleConfig
 
 
 **1.1.0**
@@ -59,13 +64,16 @@ These sections closely align to Auth0 resources:
 * clients
 * connections
 * email
-* rule configuration
+* emailTemplates
+* ruleConfigs
 
 These sections are custom and protect the resources from being deleted by the PowerShell script:
 * protectedClients
 * protectedConnections
+* protectedResourceServers
 
 These properties are required to acquire a Auth0 Management token:
+* domain
 * clientId
 * clientSecret
 
