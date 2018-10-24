@@ -371,11 +371,10 @@
 	
 	
 	# // START updating email templates //
-
+	
+	Write-Information "`nProcess email templates in ps configuration"
     Foreach ($template in $runtimeConfig.emailTemplates) {
-
-        Write-Information "`nProcess email templates in ps configuration"
-        
+       
         $body = Get-Content -Path (".\Auth0\email-templates\{0}.html" -f $template.payload.template) -ErrorAction Stop | Out-String
         $template.payload | Add-Member -MemberType NoteProperty -Name "body" -Value $body
 
