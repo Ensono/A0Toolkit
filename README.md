@@ -44,9 +44,7 @@ List of exported functions:
 
 
 ## Provisioning Auth0
-Using a combination of the [Auth0 Deploy CLI](https://github.com/auth0/auth0-deploy-cli) node application and the above module, provisioning of Auth0 can largely be automated and integrated into a deployment pipeline. There are some gaps in the Auth0 API, most noticable are:
-* API grants
-* Add Auth0 Administrators
+Using a combination of the [Auth0 Deploy CLI](https://github.com/auth0/auth0-deploy-cli) node application and the above module, provisioning of Auth0 can largely be automated and integrated into a deployment pipeline.
 
 In the folder **SampleOrchestrationScript** there is an example of how to orchestrate the functions above into a working solution.
 
