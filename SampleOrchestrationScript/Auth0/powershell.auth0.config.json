@@ -39,6 +39,46 @@
           {
             "Name": "Test Relying Party Site",
             "Delete": "#{Identity.Auth0.DeleteTestRelyingPartyClient}"
+          },
+          {
+            "Name": "automation-deploy-client",
+            "clientGrants" :[
+              {
+                "payload": {
+                  "audience": "https://#{Auth0.Core.TenantName}.eu.auth0.com/api/v2/" 
+                }
+              }
+            ]
+          },
+          {
+            "Name": "Machine to Machine Application One",
+            "clientGrants" :[
+              {
+                "payload": {
+                  "audience": "https://somecompany/car/api/v1/" 
+                }
+              },
+              {
+                "payload": {
+                  "audience": "https://somecompany/house/api/v1/",
+                  "scope": [
+                    "Read:Number",
+                    "Read:Street",
+                    "Write:Postcode"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "Name": "Machine to Machine Application Two",
+            "clientGrants" :[
+              {
+                "payload": {
+                  "audience": "https://somecompany/House/api/v1/" 
+                }
+              }
+            ]
           }
         ],
         "protectedConnections": [],

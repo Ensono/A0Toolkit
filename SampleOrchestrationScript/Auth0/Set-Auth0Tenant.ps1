@@ -8,7 +8,7 @@
 
         [Parameter(Mandatory=$false)]
         [string]$configurationFile = "Auth0\powershell.auth0.config.json",
-        
+
         [Parameter(Mandatory=$false)]
         [switch]$enableDeletions
     )
@@ -46,7 +46,7 @@
     Write-Information ("`nBuild {0} environment runtime configuration from json file" -f $targetEnvironment)    
     If ($psConfiguration.Environments.Name -contains $targetEnvironment) {
         $excludedPSOverrides = ""
-
+        
         $envConfiguration = ($psConfiguration.environments | Where-Object {$_.Name -eq $targetEnvironment}).Auth0        
         $envConfiguration | Get-Member -MemberType Properties | ForEach-Object {
         
@@ -96,10 +96,10 @@
 
     # // END acquire an Auth0 Management Token //
 
-    
-    # // START update Auth0 tenant settings //
 
-    Write-Information "`nUpdate tenant settings"
+    # // START update Auth0 tenant settings //
+    
+    Write-Information ("`nUpdate tenant settings: {0}" -f $runtimeConfig.domain)
     $response = Set-A0Tenant -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -payload $runtimeConfig.account.payload
     
     If ($response.StatusCode -ne 200) {
@@ -112,7 +112,7 @@
 
     # // END update Auth0 tenant settings //
 
-    
+   
     # // START update rule configuration //
 
     Write-Information "`nProcess rule configs in ps configuration"
@@ -132,7 +132,7 @@
     }
 
     # // END update rule configuration //
-    
+
     
     # // START update email configuration //
     
@@ -172,7 +172,7 @@
 
     
     # // START get all applications/clients and maps name and Id into a hash table //
-    
+
     Write-Information "`nGet all clients"
     $response = Get-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
     $clients = ($response.Content | ConvertFrom-Json)
@@ -200,7 +200,7 @@
 
     
     # // START get all connections and maps name and Id into a hash table //
-       
+    
     Write-Information "`nGet all connections"
     $response = Get-A0Connection -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
     $connections = ($response.Content | ConvertFrom-Json)
@@ -228,7 +228,7 @@
 
 
     # // START get all resource servers and maps name and Id into a hash table //
-        
+    
     Write-Information "`nGet all resource servers (APIs)"
     $response = Get-A0ResourceServer -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
     $resourceServers = ($response.Content | ConvertFrom-Json)
@@ -255,51 +255,172 @@
     # // END get all resource servers and maps name and Id into a hash table //
 
 
-    # // START processing clients in the PowerShell JSON configuration file //
+    # // START get all client grants //
 
+    Write-Information "`nGet all client grants"
+    $response = Get-A0ClientGrant -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain
+    $allClientGrants = ($response.Content | ConvertFrom-Json)
+
+    # // END get all client grants //
+
+
+    # // START remove client grants that do not exist in the PowerShell JSON configuration file //
+
+    Write-Information ("`nDelete client grants:")
+    Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
+
+    $clientNameToIdMapping.GetEnumerator() | ForEach-Object {
+
+        $clientMapping = $_
+        $grants = $allClientGrants | Where-Object {$_.client_id -eq $clientMapping.Value}
+
+        If ((-not $grants) -or ($runtimeConfig.protectedClients -contains $clientMapping.Name)) {
+
+            Return
+
+        } Else {
+
+            If (($runtimeConfig.clients | Where-Object {$_.Name -eq $clientMapping.Name}).clientGrants.payload.audience) {
+
+                $audiencestoDelete = Compare-Object -ReferenceObject $grants.audience -DifferenceObject ($runtimeConfig.clients | Where-Object {$_.Name -eq $clientMapping.Name}).clientGrants.payload.audience -PassThru
+
+            } Else {
+
+                $audiencestoDelete = $grants.audience
+
+            }
+                
+            $audiencestoDelete | ForEach-Object {
+                    
+                $audience = $_
+                $grantId = ($grants | Where-Object {$_.audience -eq $audience}).Id
+
+                If ([string]::IsNullOrEmpty($grantId)) {
+                    
+                    Write-Warning ("Missing grantId for client: {0} and audience: {1}" -f $clientMapping.Name, $audience)
+                    Return
+
+                }
+
+                Write-Warning ("{0}: {1} ({2})" -f $clientMapping.Name, $audience, $grantId)
+                    
+                If ($enableDeletions) {
+                    
+                    $response = Remove-A0ClientGrant -headers $runtimeConfig.headers -baseURL $runtimeConfig.Domain -grantId $grantId
+
+                    If ($response.StatusCode -ne 204) {
+
+                        Write-Warning $response.StatusCode
+                        Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                        Throw ("Error deleting Auth0 {0}" -f "clientgrant")
+
+                    }
+                }
+            }
+        }
+    }
+
+    # // END remove client grants that do not exist in the PowerShell JSON configuration file //
+
+
+    # // START processing clients in the PowerShell JSON configuration file //
+    
     Write-Information "`nProcess clients in ps configuration"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
 
-    Foreach ($client in $runtimeConfig.clients) {
+    $runtimeConfig.clients | ForEach-Object {
+        $client = $_
 
         Write-Information ("`n{0}" -f $client.Name)
         $clientId = $clientNameToIdMapping.($client.Name)
 
         If ($clientNameToIdMapping.ContainsKey($client.Name)) {
             
-            If ((-not $client.Delete) -and ($client.payload)) {
+            # // if the client has the 'Delete' property set to true, delete the client and return //
+            If (($client.Delete -eq $true) -and ($runtimeConfig.protectedClients-notcontains $client.Name) -and ($enableDeletions)) {
+                Write-Information "Remove client"
                 
-                Write-Information "Update client"
-                $response = Set-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId -payload $client.payload
+                $clientNameToIdMapping.Remove($client.Name)
+                
+                $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
 
-                If ($response.StatusCode -ne 200) {
+                If ($response.StatusCode -ne 204) {
 
                     Write-Warning $response.StatusCode
                     Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                    Throw ("Error updating {0}: {1} ({2})" -f "client", $client.Name, $clientId)
+                    Throw ("Error deleting {0}: {1} ({2})" -f "client", $client.Name, $clientId)
 
                 }
+                
+                Return
+            }
+
+
+            Write-Information "Client grants:"
+          
+            $grants = $allClientGrants | Where-Object {$_.client_id -eq $clientId}
             
-            } ElseIf ($client.Delete -eq $true) {
-                
-                Write-Information "Remove client"
-                
-                If ($enableDeletions) {
+            # // processing client grants //
+            If ($client.clientGrants) {
+  
+                $client.clientGrants | ForEach-Object {
+                    
+                    $clientGrant = $_
 
-                    $clientNameToIdMapping.Remove($client.Name)
+                    If ($resourceServers.identifier -contains $clientGrant.payload.audience) {
 
-                    $response = Remove-A0Client -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -clientId $clientId
+                        # // if scope property missing from client grants payload in ps configuration dynamically add all API scopes
+                        If (-not $clientGrant.payload.scope) {
+                            
+                            $scope = ($resourceServers | Where-Object {$_.identifier -eq $clientGrant.payload.audience}).scopes.value
 
-                    If ($response.StatusCode -ne 204) {
+                            If (-not $scope) {$scope = @()}
 
-                        Write-Warning $response.StatusCode
-                        Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                        Throw ("Error deleting {0}: {1} ({2})" -f "client", $client.Name, $clientId)
+                            $clientGrant.payload | Add-Member -MemberType NoteProperty -Name "scope" -Value $scope
 
+                        } 
+
+                    } Else {
+
+                        Write-Warning ("Missing Audience in Auth0: {0}" -f $clientGrant.payload.audience)
+                        Return
+                    }
+                    
+                    
+                    If ($grants.audience -contains $clientGrant.payload.audience) {
+
+                        Write-Information ("`nUpdate client grant: {0}" -f $clientGrant.payload.audience)
+                        
+                        $grantId = ($grants | Where-Object {$_.audience -eq $clientGrant.payload.audience}).id
+                        $clientGrant.payload.PSObject.Properties.Remove("audience")         
+                        
+                        $response = Set-A0ClientGrant -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -grantId $grantId -payload $clientGrant.payload
+
+                        If ($response.StatusCode -ne 200) {
+
+                            Write-Warning $response.StatusCode
+                            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                            Throw ("Error updating {0}" -f "clientgrant")
+
+                        }
+
+                    } Else {
+
+                        Write-Information ("`nCreating client grant: {0}" -f $clientGrant.payload.audience)
+
+                        $clientGrant.payload | Add-Member -MemberType NoteProperty -Name "client_id" -Value $clientId
+
+                        $response = New-A0ClientGrant -headers $runtimeConfig.headers -baseURL $runtimeConfig.domain -payload $clientGrant.payload
+
+                        If ($response.StatusCode -ne 201) {
+
+                            Write-Warning $response.StatusCode
+                            Write-Warning ($response.content | ConvertFrom-Json | Out-String)
+                            Throw ("Error creating {0}" -f "clientgrant")
+                        }
                     }
                 }
             }
-
         }
     }
 
@@ -307,7 +428,7 @@
 
 
     # // START processing connections in the PowerShell JSON configuration file //
-
+    
     Write-Information "`nProcess connections in ps configuration"
     Foreach ($connection in $runtimeConfig.connections) {
 
@@ -368,13 +489,13 @@
     }
 
     # // END processing connections in the PowerShell JSON configuration file //
-	
-	
-	# // START updating email templates //
-	
-	Write-Information "`nProcess email templates in ps configuration"
+
+
+    # // START updating email templates //
+
+    Write-Information "`nProcess email templates in ps configuration"
     Foreach ($template in $runtimeConfig.emailTemplates) {
-       
+        
         $body = Get-Content -Path (".\Auth0\email-templates\{0}.html" -f $template.payload.template) -ErrorAction Stop | Out-String
         $template.payload | Add-Member -MemberType NoteProperty -Name "body" -Value $body
 
@@ -393,7 +514,7 @@
 
     # // END updating email templates //
 
-    
+
     # // START remove connections that are not protected or exist in the PowerShell JSON configuration file //
     
     Write-Information "`nDelete connection"
@@ -421,9 +542,9 @@
         }
     }
 
-    # // END remove connections that are not protected or exist in the PowerShell JSON configuration file //
-
-
+    # // END remove connections that are not protected or exist in the PowerShell JSON configuration file //   
+    
+    
     # // START remove client that are not listed in the Auth0 Deploy CLI folder structure //
 
     # // ** dependency on Auth0 Deploy CLI folder structure ** //
@@ -449,7 +570,7 @@
 
                 Write-Warning $response.StatusCode
                 Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                Throw ("Error deleting Auth0 {0}" -f "client", $clientName)
+                Throw ("Error deleting Auth0 {0}" -f "client")
 
             }
 
@@ -462,7 +583,7 @@
     # // START remove resource servers that are not listed in the Auth0 Deploy CLI folder structure //
 
     # // ** dependency on Auth0 Deploy CLI folder structure ** //
-
+    
     Write-Information "`nDelete resource server"
     Write-Warning ("Enable Deletions is set to: {0}" -f $enableDeletions)
     
@@ -484,7 +605,7 @@
 
                 Write-Warning $response.StatusCode
                 Write-Warning ($response.content | ConvertFrom-Json | Out-String)
-                Throw ("Error deleting Auth0 {0}" -f "resource server", $resourceServerName)
+                Throw ("Error deleting Auth0 {0}" -f "resource server")
 
             }
             

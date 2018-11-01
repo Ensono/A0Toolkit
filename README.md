@@ -11,6 +11,13 @@ As A0Tookit is a PowerShell module it will autoload when any exported functions 
 ## A0Toolkit
 List of exported functions:
 
+**1.4.0**
+* Get-A0ClientGrant
+* New-A0ClientGrant 
+* Remove-A0ClientGrant
+* Set-A0ClientGrant
+
+
 **1.3.0**
 * Get-A0EmailTemplate
 * Set-A0EmailTemplate
