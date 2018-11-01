@@ -9,6 +9,9 @@ As A0Tookit is a PowerShell module it will autoload when any exported functions 
 
 ---
 ## A0Toolkit
+
+### *This project will no-longer be maintained due to the fact that Auth0 have re-written the `a0deploy cli` node application `v2` to support the same features as the A0Toolkit. See link below.*
+
 List of exported functions:
 
 **1.4.0**
