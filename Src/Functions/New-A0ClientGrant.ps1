@@ -1,4 +1,4 @@
-﻿Function Get-A0ClientGrants {
+﻿Function New-A0ClientGrant {
 	
     [CmdletBinding()]
     param (
@@ -13,26 +13,35 @@
         [string]$baseURL,
 
         [Parameter(Mandatory=$false)]
-        [string]$apiVersion = "v2"
-    )
+        [string]$apiVersion = "v2",
 
+        [Parameter(Mandatory=$true)]
+        [pscustomobject]$payload
+    )
+    
     Write-Host ("Running function: {0}" -f $MyInvocation.MyCommand.Name) -ForegroundColor Yellow
 
 
     # // building path //
-	$path = ("api/{0}/client-grants" -f $apiVersion)
+    $path = ("api/{0}/client-grants" -f $apiVersion)
 
     
+    # // building request body //
+    $body = $payload
+
+
     # // using splatting //
     $params = @{
 
-        "uri" = "{0}/{1}" -f $baseURL, $path
-        "method" = "GET"
+        "uri" = "{0}/{1}" -f $baseURL, $path 
+        "method" = "POST"
 
         "headers" = $headers
+
+        "body" = $body | Convertto-Json
     }
 
-    Write-Verbose ("Parameters:`n{0}`nHeaders:`n{1}" -f ($params | Out-String), ($params.headers | Out-String))
+    Write-Verbose ("Parameters:`n{0}`nHeaders:`n{1}`nBody:`n{2}" -f ($params | Out-String), ($params.headers | Out-String), $params.body)
 
     
     # //sending request //
@@ -46,7 +55,6 @@
         New-ExceptionDetail -exception $_ -parameters $params
 
         Throw $_.Exception
-
     }
 
     Return $response

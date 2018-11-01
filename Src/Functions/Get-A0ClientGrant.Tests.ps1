@@ -16,7 +16,7 @@ $testExceptionMessage = "test exception"
 
 
 
-Describe "Get-A0ClientGrants" {
+Describe "Get-A0ClientGrant" {
 
     Mock -CommandName Invoke-WebRequest -Verifiable -MockWith {@{}}
 
@@ -26,7 +26,7 @@ Describe "Get-A0ClientGrants" {
 
         It "should validate malformed URL and throw" {
 
-            {Get-A0ClientGrants -baseURL $malformedURL } | Should Throw
+            {Get-A0ClientGrant -baseURL $malformedURL } | Should Throw
 
             Assert-MockCalled -CommandName Invoke-WebRequest -Exactly -Times 0
             Assert-MockCalled -CommandName New-ExceptionDetail -Exactly -Times 0
@@ -39,7 +39,7 @@ Describe "Get-A0ClientGrants" {
 
         It "should Invoke-WebRequest and return response" {
 
-            Get-A0ClientGrants -baseURL $formedURL | Should not be $null
+            Get-A0ClientGrant -baseURL $formedURL | Should not be $null
 
             Assert-VerifiableMocks
         }
@@ -55,7 +55,7 @@ Describe "Get-A0ClientGrants" {
 
         It "should throw exception" {
 
-            {Get-A0ClientGrants -baseURL $formedURL} | Should Throw
+            {Get-A0ClientGrant -baseURL $formedURL} | Should Throw
 
         }
 
