@@ -66,6 +66,7 @@ Common can be used for shared values and overridden by other environments. If in
 These sections closely align to Auth0 resources:
 * account
 * clients
+* clients\clientGrants
 * connections
 * email
 * emailTemplates
